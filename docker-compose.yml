@@ -1,8 +1,8 @@
 version: "3.3"
 
 services:
-  no:
-    container_name: no
+  no1:
+    container_name: no1
     build:
       context: .
     ports:
@@ -13,6 +13,38 @@ services:
       - kafka
     links:
       - "kafka:kafka"
+    environment:
+      SERVER_PORT1: 10040
+    
+  no2:
+    container_name: no2
+    build:
+      context: .
+    ports:
+      - "10041:10041"
+    networks:
+      kafka-net:
+    depends_on:
+      - kafka
+    links:
+      - "kafka:kafka"
+    environment:
+      SERVER_PORT: 10041
+  
+  no3:
+    container_name: no3
+    build:
+      context: .
+    ports:
+      - "10042:10042"
+    networks:
+      kafka-net:
+    depends_on:
+      - kafka
+    links:
+      - "kafka:kafka"
+    environment:
+      SERVER_PORT: 10042
 
   zookeeper:
     container_name: zookeeper

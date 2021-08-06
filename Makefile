@@ -21,5 +21,5 @@ down: ## Stop the project
 	make rmi
 
 rmi: ## Delete images
-	$(DOCKER) image rm lyra_student
+	$(DOCKER) image rm no
 
