@@ -1,6 +1,5 @@
 package com.sd.no.controller
 
-import com.sd.no.event.Consumer
 import com.sd.no.event.Producer
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -16,6 +15,7 @@ class ElectionController(
     var serverPort: String = ""
     val maxInstances = 3
     var type: Type = Type.SEGUIDOR
+    var receivedVotes: Int = 0
     var election: MutableMap<Int, Int> = mutableMapOf()
     var term: Int = 0
     var starTime: Long = 0
@@ -33,14 +33,13 @@ class ElectionController(
                         while (!isTimeOut) {
                             isTimeOut = System.currentTimeMillis() - starTime >= timeoutElection
                         }
-                        if (!election.containsKey(term)) {
-                            type = Type.CANDIDATO
-                            election[term] = (election[term] ?: 0) + 1
-                            term++
-                            isTimeOut = false
-                            timeoutElection()
-                            producer.requestVotes()
-                        }
+                        receivedVotes = 0
+                        type = Type.CANDIDATO
+                        term++
+                        election[term] = (election[term] ?: 0) + 1
+                        receivedVotes++
+                        producer.requestVotes()
+                        timeoutElection()
                     }
                 }
             }
@@ -50,6 +49,7 @@ class ElectionController(
     final fun timeoutElection() {
         timeoutElection = Random(System.currentTimeMillis()).nextLong(from = 150, until = 300)
         starTime = System.currentTimeMillis()
+        isTimeOut = false
     }
 
     @Scheduled(fixedDelay = 50)

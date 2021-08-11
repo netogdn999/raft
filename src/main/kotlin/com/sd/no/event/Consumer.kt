@@ -29,15 +29,15 @@ class Consumer (
     fun requestVotes(@Payload payload: String) {
         val logDTO: LogDTO = jacksonObjectMapper().readValue(payload)
         if(logDTO.origin != electionController.serverPort) {
-            logger.info("request votes {}", logDTO.origin)
+            electionController.timeoutElection()
             val term = electionController.term
             val election = electionController.election
             if (election[term] == null || election[term]!! <= 0) {
+                logger.info("votando em ", electionController.serverPort)
                 election[term] = (election[term] ?: 0) + 1
-                logger.info("Vote")
+                electionController.term++
                 producer.sendVotes()
             }
-            electionController.timeoutElection()
         }
     }
 
@@ -45,13 +45,10 @@ class Consumer (
     fun receiveVotes(@Payload payload: String) {
         val logDTO: LogDTO = jacksonObjectMapper().readValue(payload)
         if(logDTO.origin != electionController.serverPort) {
-            logger.info("receivedVote")
-            val term = electionController.term
-            val election = electionController.election
             val maxInstances = electionController.maxInstances
-            election[term] = (election[term] ?: 0) + 1
-            if (election[term] != null && election[term]!! > maxInstances / 2) {
-                logger.info("Majority")
+            electionController.receivedVotes++
+            if (electionController.receivedVotes > maxInstances / 2) {
+                electionController.receivedVotes = 0
                 electionController.leader = electionController.serverPort
                 electionController.type = Type.LIDER
                 producer.appendEntries(electionController.term, electionController.leader)
@@ -65,16 +62,16 @@ class Consumer (
     fun appendEntries(@Payload payload: String) {
         val appendEntriesDTO: AppendEntriesDTO = jacksonObjectMapper().readValue(payload)
         if(appendEntriesDTO.leaderReceived != electionController.serverPort) {
+            electionController.timeoutElection()
             val termReceived: Int = appendEntriesDTO.termReceived
             val leaderReceived: String = appendEntriesDTO.leaderReceived
             val term = electionController.term
-            if (electionController.type == Type.LIDER && termReceived > term) {
+            if (electionController.type != Type.LIDER || (electionController.type == Type.LIDER && termReceived > term)) {
                 electionController.type = Type.SEGUIDOR
                 electionController.term = termReceived
+                electionController.leader = leaderReceived
+                logger.info("Novo lider {}", electionController.leader)
             }
-            logger.info("AppendEntries {}", leaderReceived)
-            electionController.leader = leaderReceived
-            electionController.timeoutElection()
         }
     }
 

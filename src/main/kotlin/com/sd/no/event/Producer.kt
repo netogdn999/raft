@@ -38,6 +38,7 @@ class Producer (
     }
 
     fun sendVotes() {
+        // todo adicionar fonte e destinatário
         val logDTO = LogDTO (
                 port,
                 12
