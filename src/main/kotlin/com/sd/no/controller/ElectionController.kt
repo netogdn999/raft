@@ -25,9 +25,9 @@ class ElectionController(
     private val logger = LoggerFactory.getLogger(ElectionController::class.java)
 
     init {
-        timeoutElection()
         Thread {
             kotlin.run {
+                timeoutElection()
                 while(true) {
                     if (type != Type.LIDER) {
                         while (!isTimeOut) {
@@ -35,10 +35,10 @@ class ElectionController(
                         }
                         receivedVotes = 0
                         type = Type.CANDIDATO
-                        term++
-                        election[term] = (election[term] ?: 0) + 1
                         receivedVotes++
                         producer.requestVotes()
+                        term++
+                        election[term] = (election[term] ?: 0) + 1
                         timeoutElection()
                     }
                 }
@@ -56,7 +56,7 @@ class ElectionController(
     fun heartBeats() {
         if(type == Type.LIDER) {
             logger.info("HeartBeat {}", leader)
-            producer.heartBeats()
+            producer.heartBeats(term)
         }
     }
 }
