@@ -2,8 +2,8 @@ package com.sd.no.event
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sd.no.dto.AppendEntriesDTO
+import com.sd.no.dto.ConfirmEntryDTO
 import com.sd.no.dto.HeartBeatDTO
-import com.sd.no.dto.LogDTO
 import com.sd.no.dto.SendVotesDTO
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.kafka.core.KafkaTemplate
@@ -21,14 +21,8 @@ class Producer (
     private val TOPIC_CONFIRM_ENTRY = "confirmEntry"
     private val TOPIC_SEND_VOTE = "sendVote"
 
-    fun requestVotes() {
-        val logDTO = LogDTO (
-            port,
-            12
-        )
-        val json = jacksonObjectMapper().writeValueAsString(logDTO)
-        kafkaTemplate.send(TOPIC_REQUEST_VOTES, json)
-    }
+    fun requestVotes() =
+        kafkaTemplate.send(TOPIC_REQUEST_VOTES, port)
 
     fun appendEntries(term: Int, leader: String) {
         val appendEntriesDTO = AppendEntriesDTO (
@@ -48,17 +42,13 @@ class Producer (
         kafkaTemplate.send(TOPIC_SEND_VOTE, json)
     }
 
-    fun heartBeats(term: Int) {
-        val heartBeatDTO = HeartBeatDTO (
-                port,
-                term,
-                "12"
-        )
+    fun heartBeats(heartBeatDTO: HeartBeatDTO) {
         val json = jacksonObjectMapper().writeValueAsString(heartBeatDTO)
         kafkaTemplate.send(TOPIC_HEART_BEATS, json)
     }
 
-    fun confirmEntry() {
-        kafkaTemplate.send(TOPIC_CONFIRM_ENTRY, "")
+    fun confirmEntry(confirmEntryDTO: ConfirmEntryDTO) {
+        val json = jacksonObjectMapper().writeValueAsString(confirmEntryDTO)
+        kafkaTemplate.send(TOPIC_CONFIRM_ENTRY, json)
     }
 }

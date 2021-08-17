@@ -7,8 +7,8 @@ import com.sd.no.controller.Type
 import com.sd.no.domain.Log
 import com.sd.no.domain.State
 import com.sd.no.dto.AppendEntriesDTO
+import com.sd.no.dto.ConfirmEntryDTO
 import com.sd.no.dto.HeartBeatDTO
-import com.sd.no.dto.LogDTO
 import com.sd.no.dto.SendVotesDTO
 import com.sd.no.repository.LogRepository
 import com.sd.no.repository.StateRepository
@@ -28,17 +28,16 @@ class Consumer (
     private val logger = LoggerFactory.getLogger(Consumer::class.java)
 
     @KafkaListener(topics = ["requestVotes"])
-    fun requestVotes(@Payload payload: String) {
-        val logDTO: LogDTO = jacksonObjectMapper().readValue(payload)
-        if(logDTO.origin != electionController.serverPort) {
+    fun requestVotes(@Payload origin: String) {
+        if(origin != electionController.serverPort) {
             electionController.timeoutElection()
             electionController.term++
             val term = electionController.term
             val election = electionController.election
             if (election[term] == null || election[term]!! <= 0) {
-                logger.info("votando em {} ", logDTO.origin)
+                logger.info("votando em {} ", origin)
                 election[term] = (election[term] ?: 0) + 1
-                producer.sendVotes(logDTO.origin)
+                producer.sendVotes(origin)
             }
         }
     }
@@ -50,9 +49,11 @@ class Consumer (
             val maxInstances = electionController.maxInstances
             electionController.receivedVotes++
             if (electionController.receivedVotes > maxInstances / 2) {
-                electionController.receivedVotes = 0
-                electionController.leader = electionController.serverPort
                 electionController.type = Type.LIDER
+                electionController.receivedVotes = 0
+                electionController.confirmEntry = 0
+                electionController.leader = electionController.serverPort
+                logger.info("Novo lider {}", electionController.leader)
                 producer.appendEntries(electionController.term, electionController.leader)
             } else {
                 electionController.timeoutElection()
@@ -64,13 +65,14 @@ class Consumer (
     fun appendEntries(@Payload payload: String) {
         val appendEntriesDTO: AppendEntriesDTO = jacksonObjectMapper().readValue(payload)
         if(appendEntriesDTO.leaderReceived != electionController.serverPort) {
-            val termReceived: Int = appendEntriesDTO.termReceived
-            val leaderReceived: String = appendEntriesDTO.leaderReceived
+            val termReceived = appendEntriesDTO.termReceived
+            val leaderReceived = appendEntriesDTO.leaderReceived
             val term = electionController.term
             if (electionController.type != Type.LIDER || (electionController.type == Type.LIDER && termReceived > term)) {
                 electionController.type = Type.SEGUIDOR
                 electionController.term = termReceived
                 electionController.leader = leaderReceived
+                logger.info("Novo lider {}", electionController.leader)
             }
             electionController.timeoutElection()
         }
@@ -78,6 +80,7 @@ class Consumer (
 
     @KafkaListener(topics = ["heartBeats"])
     fun heartBeats(@Payload payload: String) {
+        electionController.timeoutElection()
         val heartBeatDTO: HeartBeatDTO = jacksonObjectMapper().readValue(payload)
         if(heartBeatDTO.origin != electionController.serverPort) {
             val term = electionController.term
@@ -85,21 +88,33 @@ class Consumer (
                 electionController.type = Type.SEGUIDOR
                 electionController.term = heartBeatDTO.term
                 electionController.leader = heartBeatDTO.origin
-
+                logger.info("Lider com eleição maior, novo lider {}", electionController.leader)
             }
-            electionController.timeoutElection()
-            logger.info("Recebendo heartBeats de {}", electionController.leader)
-            if (logRepository.getByState(0).isPresent)
-                stateRepository.save(State(state = 0))
-            else {
-                logRepository.save(Log(state = 0))
-                producer.confirmEntry()
+            if(heartBeatDTO.data.isNotBlank()) {
+                val findByState = logRepository.findByState(heartBeatDTO.data)
+                if (findByState.isPresent) {
+                    stateRepository.save(State(state = heartBeatDTO.data))
+                } else {
+                    logRepository.save(Log(state = heartBeatDTO.data))
+                    producer.confirmEntry(ConfirmEntryDTO(
+                            electionController.leader,
+                            heartBeatDTO.data
+                    ))
+                }
             }
         }
     }
 
-    @KafkaListener(topics = ["confirm_entry"])
+    @KafkaListener(topics = ["confirmEntry"])
     fun confirmEntry(@Payload payload: String) {
-        stateRepository.save(State(state = 0))
+        val confirmEntryDTO: ConfirmEntryDTO = jacksonObjectMapper().readValue(payload)
+        if(confirmEntryDTO.origin == electionController.serverPort) {
+            electionController.confirmEntry++
+            val maxInstances = electionController.maxInstances - 1
+            if (electionController.confirmEntry > maxInstances / 2) {
+                stateRepository.save(State(state = confirmEntryDTO.log))
+                electionController.log = confirmEntryDTO.log
+            }
+        }
     }
 }

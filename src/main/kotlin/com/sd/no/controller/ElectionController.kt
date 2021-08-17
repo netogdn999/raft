@@ -1,11 +1,17 @@
 package com.sd.no.controller
 
+import com.sd.no.dto.HeartBeatDTO
 import com.sd.no.event.Producer
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import kotlin.random.Random
+
+enum class Type {
+    SEGUIDOR,
+    CANDIDATO,
+    LIDER
+}
 
 @Component
 class ElectionController(
@@ -22,7 +28,8 @@ class ElectionController(
     var timeoutElection: Long = 0
     var isTimeOut = false
     var leader: String = ""
-    private val logger = LoggerFactory.getLogger(ElectionController::class.java)
+    var log:String = ""
+    var confirmEntry:Int = 0
 
     init {
         Thread {
@@ -34,6 +41,7 @@ class ElectionController(
                             isTimeOut = System.currentTimeMillis() - starTime >= timeoutElection
                         }
                         receivedVotes = 0
+                        confirmEntry = 0
                         type = Type.CANDIDATO
                         receivedVotes++
                         producer.requestVotes()
@@ -47,16 +55,20 @@ class ElectionController(
     }
 
     final fun timeoutElection() {
-        timeoutElection = Random(System.currentTimeMillis()).nextLong(from = 150, until = 300)
+        timeoutElection = Random(System.currentTimeMillis()).nextLong(from = 15000, until = 30000)
         starTime = System.currentTimeMillis()
         isTimeOut = false
     }
 
-    @Scheduled(fixedDelay = 50)
+    @Scheduled(fixedDelay = 5000)
     fun heartBeats() {
         if(type == Type.LIDER) {
-            logger.info("HeartBeat {}", leader)
-            producer.heartBeats(term)
+            producer.heartBeats(HeartBeatDTO(
+                serverPort,
+                term,
+                log
+            ))
+            log = ""
         }
     }
 }

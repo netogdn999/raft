@@ -10,5 +10,5 @@ class State (
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Int? = null,
-    val state: Int
+    val state: String
 )
