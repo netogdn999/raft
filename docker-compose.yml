@@ -14,7 +14,7 @@ services:
     links:
       - "kafka:kafka"
     environment:
-      SERVER_PORT1: 10040
+      SERVER_PORT: 10040
     
   no2:
     container_name: no2

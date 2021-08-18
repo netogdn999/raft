@@ -84,11 +84,11 @@ class Consumer (
         val heartBeatDTO: HeartBeatDTO = jacksonObjectMapper().readValue(payload)
         if(heartBeatDTO.origin != electionController.serverPort) {
             val term = electionController.term
-            if (electionController.type == Type.LIDER && heartBeatDTO.term > term) {
+            if (heartBeatDTO.term > term) {
                 electionController.type = Type.SEGUIDOR
                 electionController.term = heartBeatDTO.term
                 electionController.leader = heartBeatDTO.origin
-                logger.info("Lider com eleição maior, novo lider {}", electionController.leader)
+                logger.info("Novo lider {}", electionController.leader)
             }
             if(heartBeatDTO.data.isNotBlank()) {
                 val findByState = logRepository.findByState(heartBeatDTO.data)
@@ -112,6 +112,7 @@ class Consumer (
             electionController.confirmEntry++
             val maxInstances = electionController.maxInstances - 1
             if (electionController.confirmEntry > maxInstances / 2) {
+                electionController.confirmEntry = 0
                 stateRepository.save(State(state = confirmEntryDTO.log))
                 electionController.log = confirmEntryDTO.log
             }
